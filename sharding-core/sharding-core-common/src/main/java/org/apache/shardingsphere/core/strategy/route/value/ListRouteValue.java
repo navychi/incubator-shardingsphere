@@ -17,9 +17,11 @@
 
 package org.apache.shardingsphere.core.strategy.route.value;
 
+import com.google.common.base.Joiner;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
+import java.util.ArrayList;
 import java.util.Collection;
 
 /**
@@ -36,4 +38,9 @@ public final class ListRouteValue<T extends Comparable<?>> implements RouteValue
     private final String tableName;
     
     private final Collection<T> values;
+    
+    @Override
+    public String toString() {
+        return tableName + "." + columnName + (1 == values.size() ? " = " + new ArrayList<>(values).get(0) : " in (" + Joiner.on(",").join(values) + ")");
+    }
 }

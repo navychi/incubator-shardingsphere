@@ -17,13 +17,18 @@
 
 package org.apache.shardingsphere.shardingproxy.transport.mysql.packet.handshake;
 
+import com.google.common.base.Optional;
 import com.google.common.base.Strings;
 import lombok.Getter;
 import org.apache.commons.codec.digest.DigestUtils;
-import org.apache.shardingsphere.core.rule.Authentication;
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.shardingsphere.core.rule.ProxyUser;
 import org.apache.shardingsphere.shardingproxy.context.ShardingProxyContext;
+import org.apache.shardingsphere.shardingproxy.transport.mysql.constant.MySQLServerErrorCode;
 
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Map.Entry;
 
 /**
  * Authentication handler for MySQL.
@@ -40,16 +45,35 @@ public final class MySQLAuthenticationHandler {
     /**
      * Login.
      *
-     * @param username connection username
-     * @param authResponse connection auth response
+     * @param response41 handshake response
      * @return login success or failure
      */
-    public boolean login(final String username, final byte[] authResponse) {
-        Authentication authentication = SHARDING_PROXY_CONTEXT.getAuthentication();
-        if (Strings.isNullOrEmpty(authentication.getPassword())) {
-            return authentication.getUsername().equals(username);
+    public Optional<MySQLServerErrorCode> login(final MySQLHandshakeResponse41Packet response41) {
+        Optional<ProxyUser> user = getUser(response41.getUsername());
+        if (!user.isPresent() || !isPasswordRight(user.get().getPassword(), response41.getAuthResponse())) {
+            return Optional.of(MySQLServerErrorCode.ER_ACCESS_DENIED_ERROR);
         }
-        return authentication.getUsername().equals(username) && Arrays.equals(getAuthCipherBytes(authentication.getPassword()), authResponse);
+        if (!isAuthorizedSchema(user.get().getAuthorizedSchemas(), response41.getDatabase())) {
+            return Optional.of(MySQLServerErrorCode.ER_DBACCESS_DENIED_ERROR);
+        }
+        return Optional.absent();
+    }
+
+    private boolean isPasswordRight(final String password, final byte[] authResponse) {
+        return Strings.isNullOrEmpty(password) || Arrays.equals(getAuthCipherBytes(password), authResponse);
+    }
+
+    private boolean isAuthorizedSchema(final Collection<String> authorizedSchemas, final String schema) {
+        return Strings.isNullOrEmpty(schema) || CollectionUtils.isEmpty(authorizedSchemas) || authorizedSchemas.contains(schema);
+    }
+    
+    private Optional<ProxyUser> getUser(final String username) {
+        for (Entry<String, ProxyUser> entry : SHARDING_PROXY_CONTEXT.getAuthentication().getUsers().entrySet()) {
+            if (entry.getKey().equals(username)) {
+                return Optional.of(entry.getValue());
+            }
+        }
+        return Optional.absent();
     }
     
     private byte[] getAuthCipherBytes(final String password) {

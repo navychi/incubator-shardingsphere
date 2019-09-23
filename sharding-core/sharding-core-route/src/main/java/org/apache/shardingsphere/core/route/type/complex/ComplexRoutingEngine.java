@@ -22,8 +22,8 @@ import com.google.common.base.Optional;
 import com.google.common.collect.Lists;
 import lombok.RequiredArgsConstructor;
 import org.apache.shardingsphere.core.exception.ShardingException;
-import org.apache.shardingsphere.core.optimize.result.OptimizeResult;
-import org.apache.shardingsphere.core.parse.antlr.sql.statement.SQLStatement;
+import org.apache.shardingsphere.core.optimize.api.statement.OptimizedStatement;
+import org.apache.shardingsphere.core.route.router.sharding.condition.ShardingConditions;
 import org.apache.shardingsphere.core.route.type.RoutingEngine;
 import org.apache.shardingsphere.core.route.type.RoutingResult;
 import org.apache.shardingsphere.core.route.type.standard.StandardRoutingEngine;
@@ -44,13 +44,13 @@ import java.util.TreeSet;
 @RequiredArgsConstructor
 public final class ComplexRoutingEngine implements RoutingEngine {
     
-    private final SQLStatement sqlStatement;
-    
     private final ShardingRule shardingRule;
     
     private final Collection<String> logicTables;
     
-    private final OptimizeResult optimizeResult;
+    private final OptimizedStatement optimizedStatement;
+    
+    private final ShardingConditions shardingConditions;
     
     @Override
     public RoutingResult route() {
@@ -60,7 +60,7 @@ public final class ComplexRoutingEngine implements RoutingEngine {
             Optional<TableRule> tableRule = shardingRule.findTableRule(each);
             if (tableRule.isPresent()) {
                 if (!bindingTableNames.contains(each)) {
-                    result.add(new StandardRoutingEngine(sqlStatement, shardingRule, tableRule.get().getLogicTable(), optimizeResult).route());
+                    result.add(new StandardRoutingEngine(shardingRule, tableRule.get().getLogicTable(), optimizedStatement, shardingConditions).route());
                 }
                 Optional<BindingTableRule> bindingTableRule = shardingRule.findBindingTableRule(each);
                 if (bindingTableRule.isPresent()) {
